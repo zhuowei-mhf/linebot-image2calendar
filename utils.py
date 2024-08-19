@@ -83,8 +83,7 @@ def arrange_flex_message(gcal_url: str):
                         "style": "link",
                         "height": "sm",
                         "action": {"type": "uri", "label": "WEBSITE", "uri": gcal_url},
-                    },
-                    # action,
+                    }
                 ],
                 "flex": 0,
             },
