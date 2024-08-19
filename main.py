@@ -111,9 +111,6 @@ def handle_text_message(event):
     user_chat_path = f"chat/{user_id}"
     # chat_state_path = f'state/{user_id}'
     conversation_data = fdb.get(user_chat_path, None)
-    print("="*10)
-    print(conversation_data)
-    print("="*10)
     model = genai.GenerativeModel("gemini-1.5-pro")
 
     if conversation_data is None:
@@ -124,6 +121,15 @@ def handle_text_message(event):
     if text == "C":
         fdb.delete(user_chat_path, None)
         reply_msg = "已清空對話紀錄"
+    elif is_url_valid(text):
+        image_data = check_image(text)
+        image_data = json.loads(image_data)
+        reply_msg = create_gcal_url(
+            image_data["title"],
+            image_data["time"],
+            image_data["location"],
+            image_data["content"],
+        )
     elif text == "A":
         response = model.generate_content(
             f"Summary the following message in Traditional Chinese by less 5 list points. \n{messages}"
@@ -136,9 +142,6 @@ def handle_text_message(event):
         # 更新firebase中的對話紀錄
         fdb.put_async(user_chat_path, None, messages)
         reply_msg = response.text
-        print("="*10)
-        print(reply_msg)
-        print("="*10)
 
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
