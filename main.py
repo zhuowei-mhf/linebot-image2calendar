@@ -102,7 +102,7 @@ async def handle_callback(request: Request):
         raise HTTPException(status_code=400, detail="Invalid signature")
 
 @handler.add(MessageEvent, message=TextMessageContent)
-def handle_text_message(event):
+async def handle_text_message(event):
     logging.info(event)
     text = event.message.text
     user_id = event.source.user_id
@@ -137,7 +137,7 @@ def handle_text_message(event):
     fdb.put_async(user_chat_path, None, messages)
     reply_msg = response.text
 
-    line_bot_api.reply_message(
+    await line_bot_api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
             messages=[TextMessage(text=reply_msg)],
