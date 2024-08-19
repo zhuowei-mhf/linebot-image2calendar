@@ -101,7 +101,7 @@ async def handle_callback(request: Request):
 
 
 @handler.add(MessageEvent, message=TextMessageContent)
-async def handle_text_message(event):
+def handle_text_message(event):
     logging.info(event)
     text = event.message.text
     user_id = event.source.user_id
@@ -138,7 +138,7 @@ async def handle_text_message(event):
 
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
-        await line_bot_api.reply_message(
+        line_bot_api.reply_message(
             ReplyMessageRequest(
                 reply_token=event.reply_token,
                 messages=[TextMessage(text=reply_msg)],
