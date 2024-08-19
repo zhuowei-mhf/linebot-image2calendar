@@ -128,13 +128,13 @@ def handle_text_message(event):
             f"Summary the following message in Traditional Chinese by less 5 list points. \n{messages}"
         )
         reply_msg = response.text
-    # model = genai.GenerativeModel('gemini-pro')
-    messages.append({"role": "user", "parts": [text]})
-    response = model.generate_content(messages)
-    messages.append({"role": "model", "parts": [text]})
-    # 更新firebase中的對話紀錄
-    fdb.put_async(user_chat_path, None, messages)
-    reply_msg = response.text
+    else:
+        messages.append({"role": "user", "parts": [text]})
+        response = model.generate_content(messages)
+        messages.append({"role": "model", "parts": [text]})
+        # 更新firebase中的對話紀錄
+        fdb.put_async(user_chat_path, None, messages)
+        reply_msg = response.text
 
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
