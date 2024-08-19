@@ -10,15 +10,15 @@ if os.getenv("API_ENV") != "production":
 
 
 from fastapi import FastAPI, HTTPException, Request
-from linebot.v3 import (
-    WebhookHandler
-)
+from linebot.v3 import WebhookHandler
 from linebot.v3.messaging import (
     AsyncApiClient,
     AsyncMessagingApi,
     Configuration,
     ReplyMessageRequest,
     TextMessage,
+    ApiClient,
+    MessagingApi,
 )
 from linebot.v3.exceptions import InvalidSignatureError
 from linebot.v3.webhooks import (
@@ -45,8 +45,6 @@ if channel_access_token is None:
 
 configuration = Configuration(access_token=channel_access_token)
 
-async_api_client = AsyncApiClient(configuration)
-line_bot_api = AsyncMessagingApi(async_api_client)
 handler = WebhookHandler(channel_secret)
 
 
@@ -101,6 +99,7 @@ async def handle_callback(request: Request):
     except InvalidSignatureError:
         raise HTTPException(status_code=400, detail="Invalid signature")
 
+
 @handler.add(MessageEvent, message=TextMessageContent)
 async def handle_text_message(event):
     logging.info(event)
@@ -120,7 +119,7 @@ async def handle_text_message(event):
         messages = []
     else:
         messages = chatgpt
-    
+
     if text == "C":
         fdb.delete(user_chat_path, None)
         reply_msg = "已清空對話紀錄"
@@ -137,12 +136,14 @@ async def handle_text_message(event):
     fdb.put_async(user_chat_path, None, messages)
     reply_msg = response.text
 
-    await line_bot_api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=[TextMessage(text=reply_msg)],
+    with ApiClient(configuration) as api_client:
+        line_bot_api = MessagingApi(api_client)
+        await line_bot_api.reply_message(
+            ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[TextMessage(text=reply_msg)],
+            )
         )
-    )
 
     return "OK"
 
