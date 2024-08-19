@@ -114,35 +114,35 @@ def handle_text_message(event):
     # chat_state_path = f'state/{user_id}'
     chatgpt = fdb.get(user_chat_path, None)
 
-    if msg_type == "text":
-        if chatgpt is None:
-            messages = []
-        else:
-            messages = chatgpt
-        
-        if text == "C":
-            fdb.delete(user_chat_path, None)
-            reply_msg = "已清空對話紀錄"
-        elif text == "A":
-            model = genai.GenerativeModel("gemini-1.5-pro")
-            response = model.generate_content(
-                f"Summary the following message in Traditional Chinese by less 5 list points. \n{messages}"
-            )
-            reply_msg = response.text
-        # model = genai.GenerativeModel('gemini-pro')
-        messages.append({"role": "user", "parts": [text]})
-        response = model.generate_content(messages)
-        messages.append({"role": "model", "parts": [text]})
-        # 更新firebase中的對話紀錄
-        fdb.put_async(user_chat_path, None, messages)
-        reply_msg = response.text
+    model = genai.GenerativeModel("gemini-1.5-pro")
 
-        line_bot_api.reply_message(
-            ReplyMessageRequest(
-                reply_token=event.reply_token,
-                messages=[TextMessage(text=reply_msg)],
-            )
+    if chatgpt is None:
+        messages = []
+    else:
+        messages = chatgpt
+    
+    if text == "C":
+        fdb.delete(user_chat_path, None)
+        reply_msg = "已清空對話紀錄"
+    elif text == "A":
+        response = model.generate_content(
+            f"Summary the following message in Traditional Chinese by less 5 list points. \n{messages}"
         )
+        reply_msg = response.text
+    # model = genai.GenerativeModel('gemini-pro')
+    messages.append({"role": "user", "parts": [text]})
+    response = model.generate_content(messages)
+    messages.append({"role": "model", "parts": [text]})
+    # 更新firebase中的對話紀錄
+    fdb.put_async(user_chat_path, None, messages)
+    reply_msg = response.text
+
+    line_bot_api.reply_message(
+        ReplyMessageRequest(
+            reply_token=event.reply_token,
+            messages=[TextMessage(text=reply_msg)],
+        )
+    )
 
     return "OK"
 
