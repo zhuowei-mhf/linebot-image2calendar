@@ -12,8 +12,6 @@ if os.getenv("API_ENV") != "production":
 from fastapi import FastAPI, HTTPException, Request
 from linebot.v3 import WebhookHandler
 from linebot.v3.messaging import (
-    AsyncApiClient,
-    AsyncMessagingApi,
     Configuration,
     ReplyMessageRequest,
     TextMessage,
@@ -50,7 +48,7 @@ handler = WebhookHandler(channel_secret)
 
 import google.generativeai as genai
 from firebase import firebase
-from utils import check_image, create_gcal_url, is_url_valid
+from utils import arrange_flex_message, check_image, create_gcal_url, is_url_valid
 
 
 firebase_url = os.getenv("FIREBASE_URL")
@@ -120,28 +118,29 @@ def handle_text_message(event):
 
     if text == "C":
         fdb.delete(user_chat_path, None)
-        reply_msg = "已清空對話紀錄"
+        reply_msg = TextMessage("已清空對話紀錄")
     elif is_url_valid(text):
         image_data = check_image(text)
         image_data = json.loads(image_data)
-        reply_msg = create_gcal_url(
+        g_url = create_gcal_url(
             image_data["title"],
             image_data["time"],
             image_data["location"],
             image_data["content"],
         )
+        reply_msg = arrange_flex_message(g_url)
     elif text == "A":
         response = model.generate_content(
             f"Summary the following message in Traditional Chinese by less 5 list points. \n{messages}"
         )
-        reply_msg = response.text
+        reply_msg = TextMessage(response.text)
     else:
         messages.append({"role": "user", "parts": [text]})
         response = model.generate_content(messages)
         messages.append({"role": "model", "parts": [text]})
         # 更新firebase中的對話紀錄
         fdb.put_async(user_chat_path, None, messages)
-        reply_msg = response.text
+        reply_msg = TextMessage(response.text)
 
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)

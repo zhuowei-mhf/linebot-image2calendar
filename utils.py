@@ -5,6 +5,7 @@ from PIL import Image
 from io import BytesIO
 import urllib
 import google.generativeai as genai
+from linebot.v3.messaging import FlexMessage
 
 
 def is_url_valid(url):
@@ -65,3 +66,27 @@ def check_image(
         )
         return response.text
     return "None"
+
+
+def arrange_flex_message(gcal_url: str):
+    return FlexMessage(
+        alt_text="行事曆網址",
+        contents={
+            "type": "bubble",
+            "footer": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "sm",
+                "contents": [
+                    {
+                        "type": "button",
+                        "style": "link",
+                        "height": "sm",
+                        "action": {"type": "uri", "label": "WEBSITE", "uri": gcal_url},
+                    },
+                    # action,
+                ],
+                "flex": 0,
+            },
+        },
+    )
