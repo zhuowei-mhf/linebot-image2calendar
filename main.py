@@ -97,7 +97,7 @@ async def handle_callback(request: Request):
     body = body.decode()
 
     try:
-        await handler.handle(body, signature)
+        handler.handle(body, signature)
     except InvalidSignatureError:
         raise HTTPException(status_code=400, detail="Invalid signature")
 
