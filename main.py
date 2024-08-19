@@ -106,19 +106,20 @@ def handle_text_message(event):
     text = event.message.text
     user_id = event.source.user_id
 
-    msg_type = event.message.type
     fdb = firebase.FirebaseApplication(firebase_url, None)
 
     user_chat_path = f"chat/{user_id}"
     # chat_state_path = f'state/{user_id}'
-    chatgpt = fdb.get(user_chat_path, None)
-
+    conversation_data = fdb.get(user_chat_path, None)
+    print("="*10)
+    print(conversation_data)
+    print("="*10)
     model = genai.GenerativeModel("gemini-1.5-pro")
 
-    if chatgpt is None:
+    if conversation_data is None:
         messages = []
     else:
-        messages = chatgpt
+        messages = conversation_data
 
     if text == "C":
         fdb.delete(user_chat_path, None)
@@ -135,6 +136,9 @@ def handle_text_message(event):
         # 更新firebase中的對話紀錄
         fdb.put_async(user_chat_path, None, messages)
         reply_msg = response.text
+        print("="*10)
+        print(reply_msg)
+        print("="*10)
 
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
