@@ -147,7 +147,7 @@ def handle_text_message(event):
         line_bot_api.reply_message(
             ReplyMessageRequest(
                 reply_token=event.reply_token,
-                messages=[TextMessage(text=reply_msg)],
+                messages=[reply_msg],
             )
         )
 
