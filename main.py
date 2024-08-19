@@ -13,7 +13,6 @@ from fastapi import FastAPI, HTTPException, Request
 from linebot.v3 import (
     WebhookHandler
 )
-from linebot.v3.webhook import WebhookParser
 from linebot.v3.messaging import (
     AsyncApiClient,
     AsyncMessagingApi,
@@ -48,8 +47,7 @@ configuration = Configuration(access_token=channel_access_token)
 
 async_api_client = AsyncApiClient(configuration)
 line_bot_api = AsyncMessagingApi(async_api_client)
-parser = WebhookParser(channel_secret)
-handler = WebhookHandler(os.getenv('LINE_CHANNEL_SECRET'))
+handler = WebhookHandler(channel_secret)
 
 
 import google.generativeai as genai
@@ -99,12 +97,12 @@ async def handle_callback(request: Request):
     body = body.decode()
 
     try:
-        handler.handle(body, signature)
+        await handler.handle(body, signature)
     except InvalidSignatureError:
         raise HTTPException(status_code=400, detail="Invalid signature")
 
 @handler.add(MessageEvent, message=TextMessageContent)
-async def handle_text_message(event):
+def handle_text_message(event):
     logging.info(event)
     text = event.message.text
     user_id = event.source.user_id
@@ -139,7 +137,7 @@ async def handle_text_message(event):
         fdb.put_async(user_chat_path, None, messages)
         reply_msg = response.text
 
-        await line_bot_api.reply_message(
+        line_bot_api.reply_message(
             ReplyMessageRequest(
                 reply_token=event.reply_token,
                 messages=[TextMessage(text=reply_msg)],
