@@ -67,11 +67,8 @@ async def health():
 @app.get("/")
 async def find_image_keyword(img_url: str):
     image_data = check_image(img_url)
-    print(image_data)
     image_data = json.loads(image_data)
-    print("=" * 20)
-    print(image_data["time"])
-    print("=" * 20)
+
     g_url = create_gcal_url(
         image_data["title"],
         image_data["time"],

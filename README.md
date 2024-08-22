@@ -1,13 +1,15 @@
-# FastAPI LINE Bot with Gemini AI and Firebase Integration
+# 把宣傳文宣轉換成行事曆連結！
 
-This project is a FastAPI application that integrates with LINE Messaging API, Gemini AI, and Firebase to handle various types of messages and provide intelligent responses.
+平時收到各種廣告文宣(職棒比賽、系上活動、社團...etc)，收到後卻因為忘了放進行事曆而錯過了很多活動跟獎品
+
+因此透過這個專案，只要把`圖片`或`圖片網址`給 LINE Bot，就能夠幫你產生一個 Google Calendar 連結，讓你變成一個活動達人！
 
 ## Features
 
-- **Health Check Endpoint**: Simple endpoint to check if the service is running.
-- **LINE Webhook Handler**: Handles incoming messages from LINE and responds accordingly.
-- **Gemini AI Integration**: Uses Gemini AI to process and generate responses based on the content of the messages.
-- **Firebase Integration**: Stores and retrieves chat history from Firebase.
+- 健康檢查
+- 圖片關鍵字搜尋並生成 Google Calendar URL
+- 使用 Google Gemini Pro API 生成對話內容
+- 對話記錄儲存於 Firebase
 
 ## Prerequisites
 
@@ -15,65 +17,52 @@ This project is a FastAPI application that integrates with LINE Messaging API, G
 - LINE Messaging API account
 - Gemini AI API key
 - Firebase project
-- .env file with the following environment variables:
-  - `API_ENV`
+- 環境變數檔案請參考 `.env.sample`，地端開發請改名為 `.env`:
+  - `API_ENV`: 應用程式運行環境（例如：`production` 或 `develop`）
   - `LINE_CHANNEL_SECRET`
   - `LINE_CHANNEL_ACCESS_TOKEN`
   - `LOG`
-  - `FIREBASE_URL`
-  - `GEMINI_API_KEY`
-  - `OPEN_API_KEY`
+  - `FIREBASE_URL`: Firebase Realtime DB url
+  - `GEMINI_API_KEY`: Google 生成式 API key
+  - `REURL_API_KEY`: REURL 服務的 API key，縮短網址用
 
 ## Installation
 
-1. Clone the repository:
+1. Clone 專案:
     ```bash
-    git clone <repository_url>
-    cd <repository_directory>
+    git clone https://github.com/louis70109/linebot-image2calendar.git
+    cd linebot-image2calendar
     ```
 
-2. Create and activate a virtual environment:
+2. 透過虛擬環境開啟:
     ```bash
     python -m venv venv
     source venv/bin/activate  # On Windows use `venv\Scripts\activate`
     ```
 
-3. Install the dependencies:
+3. 安裝套件:
     ```bash
     pip install -r requirements.txt
     ```
 
-4. Create a `.env` file in the root directory and add the required environment variables.
+4. 將 `.env.sample` 改名為 `.env` 並把相對應的參數都放入
 
-## Usage
+## 啟動服務
 
-1. Run the FastAPI application:
+1. 開啟 FastAPI application:
     ```bash
     uvicorn main:app --host 0.0.0.0 --port 8080 --reload
+    // python main.py
     ```
 
-2. The application will start and listen for incoming requests on the specified port.
 
 ## Endpoints
 
-- **GET /health**: Health check endpoint to verify if the service is running.
-- **POST /webhooks/line**: Webhook endpoint to handle incoming messages from LINE.
-
-## Environment Variables
-
-- `API_ENV`: Set to `production` or `develop`.
-- `LINE_CHANNEL_SECRET`: Your LINE channel secret.
-- `LINE_CHANNEL_ACCESS_TOKEN`: Your LINE channel access token.
-- `LOG`: Logging level (default is `WARNING`).
-- `FIREBASE_URL`: Your Firebase database URL.
-- `GEMINI_API_KEY`: Your Gemini AI API key.
-- `OPEN_API_KEY`: Your Open Data API key.
-
-## Logging
-
-The application uses Python's built-in logging module. The log level can be set using the `LOG` environment variable.
+- **GET /?img_url=xxx**: 透過網址抓取圖片，並藉由 Gemini 找到其中的關鍵字，生成 Google Calendar URL
+- **GET /health**: 健康檢查
+- **POST /webhooks/line**: LINE Bot webhook 使用
 
 ## License
 
-This project is licensed under the MIT License.
+MIT License.
 
