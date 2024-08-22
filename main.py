@@ -48,7 +48,7 @@ handler = WebhookHandler(channel_secret)
 
 import google.generativeai as genai
 from firebase import firebase
-from utils import arrange_flex_message, check_image, create_gcal_url, is_url_valid
+from utils import check_image, create_gcal_url, is_url_valid, shorten_url_by_reurl_api
 
 
 firebase_url = os.getenv("FIREBASE_URL")
@@ -118,7 +118,7 @@ def handle_text_message(event):
 
     if text == "C":
         fdb.delete(user_chat_path, None)
-        reply_msg = TextMessage(text="已清空對話紀錄")
+        reply_msg = "已清空對話紀錄"
     elif is_url_valid(text):
         image_data = check_image(text)
         image_data = json.loads(image_data)
@@ -128,30 +128,26 @@ def handle_text_message(event):
             image_data["location"],
             image_data["content"],
         )
-        reply_msg = arrange_flex_message(g_url)
-        logger.warning("="*20)
-        logger.warning(reply_msg)
-        logger.warning(type(reply_msg))
-        logger.warning("="*20)
+        reply_msg = shorten_url_by_reurl_api(g_url)
     elif text == "A":
         response = model.generate_content(
             f"Summary the following message in Traditional Chinese by less 5 list points. \n{messages}"
         )
-        reply_msg = TextMessage(text=response.text)
+        reply_msg = response.text
     else:
         messages.append({"role": "user", "parts": [text]})
         response = model.generate_content(messages)
         messages.append({"role": "model", "parts": [text]})
         # 更新firebase中的對話紀錄
         fdb.put_async(user_chat_path, None, messages)
-        reply_msg = TextMessage(text=response.text)
+        reply_msg = response.text
 
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
         line_bot_api.reply_message(
             ReplyMessageRequest(
                 reply_token=event.reply_token,
-                messages=[reply_msg],
+                messages=[TextMessage(reply_msg)],
             )
         )
 

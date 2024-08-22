@@ -1,6 +1,8 @@
 import os
 import re
 import requests
+import json
+
 from PIL import Image
 from io import BytesIO
 import urllib
@@ -53,7 +55,6 @@ def check_image(
             如果是中華民國年，請轉換成西元年，例如 110 年要轉換成 2021 年。
             content 請只保留純文字，不要有任何 HTML 標籤，並且幫忙列點一些活動的注意事項。
             不准有 markdown 的格式。
-            整體內容長度限制為 500 字以內。
             輸出成 JSON 格式，絕對不能有其他多餘的格式，例如：
             {
                 "time": "20240409T070000Z",
@@ -69,24 +70,22 @@ def check_image(
     return "None"
 
 
-def arrange_flex_message(gcal_url: str):
-    return FlexMessage(
-        alt_text="行事曆網址",
-        contents={
-            "type": "bubble",
-            "footer": {
-                "type": "box",
-                "layout": "vertical",
-                "spacing": "sm",
-                "contents": [
-                    {
-                        "type": "button",
-                        "style": "link",
-                        "height": "sm",
-                        "action": {"type": "uri", "label": "WEBSITE", "uri": gcal_url},
-                    }
-                ],
-                "flex": 0,
-            },
-        },
+def shorten_url_by_reurl_api(url):
+    url = "https://api.reurl.cc/shorten"
+
+    headers = {
+        "Content-Type": "application/json",
+        "reurl-api-key": os.getenv("REURL_API_KEY"),
+    }
+
+    response = requests.post(
+        url,
+        headers=headers,
+        data=json.dumps(
+            {
+                "url": url,
+            }
+        ),
     )
+
+    return response.json()
