@@ -39,7 +39,7 @@ def check_image(
     b_image=None
 ):
     genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-    if url is None:
+    if url is not None:
         response = requests.get(url)
         if response.status_code == 200:
             image_data = response.content
