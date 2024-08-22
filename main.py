@@ -17,12 +17,10 @@ from linebot.v3.messaging import (
     TextMessage,
     ApiClient,
     MessagingApi,
+    MessagingApiBlob,
 )
 from linebot.v3.exceptions import InvalidSignatureError
-from linebot.v3.webhooks import (
-    MessageEvent,
-    TextMessageContent,
-)
+from linebot.v3.webhooks import MessageEvent, TextMessageContent, ImageMessageContent
 
 import uvicorn
 from fastapi.responses import RedirectResponse
@@ -149,6 +147,31 @@ def handle_text_message(event):
         )
 
     return "OK"
+
+
+@handler.add(MessageEvent, message=ImageMessageContent)
+def handle_github_message(event):
+    image_content = b""
+    with ApiClient(configuration) as api_client:
+        line_bot_blob_api = MessagingApiBlob(api_client)
+        image_content = line_bot_blob_api.get_message_content(event.message.id)
+    image_data = check_image(b_image=image_content)
+    image_data = json.loads(image_data)
+    g_url = create_gcal_url(
+        image_data["title"],
+        image_data["time"],
+        image_data["location"],
+        image_data["content"],
+    )
+    reply_msg = shorten_url_by_reurl_api(g_url)
+
+    with ApiClient(configuration) as api_client:
+        line_bot_api = MessagingApi(api_client)
+        line_bot_api.reply_message(
+            ReplyMessageRequest(
+                replyToken=event.reply_token, messages=[TextMessage(text=reply_msg)]
+            )
+        )
 
 
 if __name__ == "__main__":
