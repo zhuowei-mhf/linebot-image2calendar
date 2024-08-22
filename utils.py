@@ -70,7 +70,7 @@ def check_image(
     return "None"
 
 
-def shorten_url_by_reurl_api(url):
+def shorten_url_by_reurl_api(short_url):
     url = "https://api.reurl.cc/shorten"
 
     headers = {
@@ -83,7 +83,7 @@ def shorten_url_by_reurl_api(url):
         headers=headers,
         data=json.dumps(
             {
-                "url": url,
+                "url": short_url,
             }
         ),
     )
