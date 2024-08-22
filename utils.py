@@ -88,4 +88,4 @@ def shorten_url_by_reurl_api(url):
         ),
     )
 
-    return response.json()
+    return response.json()["short_url"]
