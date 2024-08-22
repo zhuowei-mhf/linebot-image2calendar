@@ -172,6 +172,7 @@ def handle_github_message(event):
                 replyToken=event.reply_token, messages=[TextMessage(text=reply_msg)]
             )
         )
+    return "OK"
 
 
 if __name__ == "__main__":

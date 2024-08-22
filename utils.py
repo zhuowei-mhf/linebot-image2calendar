@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import requests
@@ -7,6 +8,9 @@ from PIL import Image
 from io import BytesIO
 import urllib
 import google.generativeai as genai
+
+
+logger = logging.getLogger(__file__)
 
 
 def is_url_valid(url):
@@ -47,6 +51,7 @@ def check_image(
         image_data = b_image
     else:
         return "None"
+    logger.info(f"URL: {url} \n Image: {b_image}")
     image = Image.open(BytesIO(image_data))
 
     model = genai.GenerativeModel("gemini-1.5-flash")
@@ -70,6 +75,9 @@ def check_image(
             image,
         ]
     )
+
+    logger.info(response.text)
+
     return response.text
 
 
@@ -91,5 +99,5 @@ def shorten_url_by_reurl_api(short_url):
             }
         ),
     )
-
+    logger.info(response.json())
     return response.json()["short_url"]
