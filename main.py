@@ -129,6 +129,10 @@ def handle_text_message(event):
             image_data["content"],
         )
         reply_msg = arrange_flex_message(g_url)
+        logger.warning("="*20)
+        logger.warning(reply_msg)
+        logger.warning(type(reply_msg))
+        logger.warning("="*20)
     elif text == "A":
         response = model.generate_content(
             f"Summary the following message in Traditional Chinese by less 5 list points. \n{messages}"
