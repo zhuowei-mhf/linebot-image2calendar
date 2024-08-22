@@ -118,7 +118,7 @@ def handle_text_message(event):
 
     if text == "C":
         fdb.delete(user_chat_path, None)
-        reply_msg = TextMessage("已清空對話紀錄")
+        reply_msg = TextMessage(text="已清空對話紀錄")
     elif is_url_valid(text):
         image_data = check_image(text)
         image_data = json.loads(image_data)
@@ -137,14 +137,14 @@ def handle_text_message(event):
         response = model.generate_content(
             f"Summary the following message in Traditional Chinese by less 5 list points. \n{messages}"
         )
-        reply_msg = TextMessage(response.text)
+        reply_msg = TextMessage(text=response.text)
     else:
         messages.append({"role": "user", "parts": [text]})
         response = model.generate_content(messages)
         messages.append({"role": "model", "parts": [text]})
         # 更新firebase中的對話紀錄
         fdb.put_async(user_chat_path, None, messages)
-        reply_msg = TextMessage(response.text)
+        reply_msg = TextMessage(text=response.text)
 
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
