@@ -157,6 +157,8 @@ def handle_github_message(event):
         image_content = line_bot_blob_api.get_message_content(event.message.id)
     image_data = check_image(b_image=image_content)
     image_data = json.loads(image_data)
+    logger.info("---- Image handler JSON ----")
+    logger.info(image_data)
     g_url = create_gcal_url(
         image_data["title"],
         image_data["time"],
