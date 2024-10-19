@@ -219,8 +219,8 @@ def handle_github_message(event):
         image_data["location"],
         image_data["content"],
     )
-    reply_msg = shorten_url_by_reurl_api(g_url)
-
+    #reply_msg = shorten_url_by_reurl_api(g_url)
+    reply_msg = shorten_url_by_reurl_api(image_data)
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
         line_bot_api.reply_message(
