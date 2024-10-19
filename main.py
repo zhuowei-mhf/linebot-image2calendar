@@ -159,13 +159,14 @@ def handle_github_message(event):
     image_data = json.loads(image_data)
     logger.info("---- Image handler JSON ----")
     logger.info(image_data)
+    logger.info(json.dump(image_data))
     g_url = create_gcal_url(
         image_data["title"],
         image_data["time"],
         image_data["location"],
         image_data["content"],
     )
-    reply_msg = image_data
+    reply_msg = json.dump(image_data)
 
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
