@@ -2,12 +2,8 @@ import json
 import logging
 import os
 import sys
-
-if os.getenv("API_ENV") != "production":
-    from dotenv import load_dotenv
-
-    load_dotenv()
-
+import openai
+import re
 
 from fastapi import FastAPI, HTTPException, Request
 from linebot.v3 import WebhookHandler
@@ -17,73 +13,79 @@ from linebot.v3.messaging import (
     TextMessage,
     ApiClient,
     MessagingApi,
-    MessagingApiBlob,
 )
 from linebot.v3.exceptions import InvalidSignatureError
-from linebot.v3.webhooks import MessageEvent, TextMessageContent, ImageMessageContent
-
+from linebot.v3.webhooks import MessageEvent, TextMessageContent
+from dotenv import load_dotenv
+from firebase import firebase
 import uvicorn
-from fastapi.responses import RedirectResponse
+from openai import AssistantEventHandler
+from typing_extensions import override
 
-logging.basicConfig(level=os.getenv("LOG", "WARNING"))
+# Load environment variables from .env file
+if os.getenv("API_ENV") != "production":
+    load_dotenv()
+
+# Logging setup
+logging.basicConfig(level=os.getenv("LOG", "INFO"))
 logger = logging.getLogger(__file__)
 
+# FastAPI app initialization
 app = FastAPI()
 
-channel_secret = os.getenv("LINE_CHANNEL_SECRET", None)
-channel_access_token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", None)
-if channel_secret is None:
-    print("Specify LINE_CHANNEL_SECRET as environment variable.")
-    sys.exit(1)
-if channel_access_token is None:
-    print("Specify LINE_CHANNEL_ACCESS_TOKEN as environment variable.")
+# LINE Bot configuration
+channel_secret = os.getenv("LINE_CHANNEL_SECRET")
+channel_access_token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
+
+if not channel_secret or not channel_access_token:
+    print("LINE credentials not set.")
     sys.exit(1)
 
 configuration = Configuration(access_token=channel_access_token)
-
 handler = WebhookHandler(channel_secret)
 
+# OpenAI client initialization
+openai.api_key = os.getenv("OPENAI_API_KEY")
+client = openai.OpenAI()
 
-import google.generativeai as genai
-from firebase import firebase
-from utils import check_image, create_gcal_url, is_url_valid, shorten_url_by_reurl_api
+# Assistant ID from environment variables
+assistant_id = os.getenv("OPENAI_ASSISTANT_ID")
 
-
+# Firebase setup
 firebase_url = os.getenv("FIREBASE_URL")
-gemini_key = os.getenv("GEMINI_API_KEY")
+fdb = firebase.FirebaseApplication(firebase_url, None)
 
+# Define an EventHandler for streaming responses
+class EventHandler(AssistantEventHandler):
+    def __init__(self):
+        super().__init__()
+        self.final_response = ""
 
-# Initialize the Gemini Pro API
-genai.configure(api_key=gemini_key)
+    @override
+    def on_text_created(self, text: str) -> None:
+        """Handle the initial creation of text."""
+        print(f"\nassistant > {text}", end="", flush=True)
 
+    @override
+    def on_text_delta(self, delta, snapshot):
+        """Accumulate text deltas as they stream in."""
+        self.final_response += delta.value
+        print(delta.value, end="", flush=True)
 
+    @override
+    def on_tool_call_created(self, tool_call):
+        """Log when a tool call is made."""
+        print(f"\nassistant > Tool call: {tool_call.type}\n", flush=True)
+
+# Health check endpoint
 @app.get("/health")
 async def health():
     return "ok"
 
-
-@app.get("/")
-async def find_image_keyword(img_url: str):
-    image_data = check_image(img_url)
-    image_data = json.loads(image_data)
-
-    g_url = create_gcal_url(
-        image_data["title"],
-        image_data["time"],
-        image_data["location"],
-        image_data["content"],
-    )
-    if is_url_valid(g_url):
-        return RedirectResponse(g_url)
-    else:
-        return "Error"
-
-
+# LINE webhook endpoint
 @app.post("/webhooks/line")
 async def handle_callback(request: Request):
     signature = request.headers["X-Line-Signature"]
-
-    # get request body as text
     body = await request.body()
     body = body.decode()
 
@@ -92,62 +94,114 @@ async def handle_callback(request: Request):
     except InvalidSignatureError:
         raise HTTPException(status_code=400, detail="Invalid signature")
 
-
 @handler.add(MessageEvent, message=TextMessageContent)
-def handle_text_message(event):
-    logging.info(event)
-    text = event.message.text
+def handle_text_message(event: MessageEvent):
+    """Handle incoming messages."""
+    text = event.message.text.strip()
     user_id = event.source.user_id
 
-    fdb = firebase.FirebaseApplication(firebase_url, None)
-
+    # Paths for user data in Firebase
     user_chat_path = f"chat/{user_id}"
-    # chat_state_path = f'state/{user_id}'
-    conversation_data = fdb.get(user_chat_path, None)
-    model = genai.GenerativeModel("gemini-1.5-pro")
+    user_data_path = f"users/{user_id}"
 
-    if conversation_data is None:
-        messages = []
+    # Retrieve or create thread ID
+    thread_id = fdb.get(user_chat_path, "thread_id")
+    if not thread_id:
+        logger.info(f"Creating a new thread for user {user_id}.")
+        thread = client.beta.threads.create()
+        thread_id = thread.id
+        fdb.put(user_chat_path, "thread_id", thread_id)
+
+    # Retrieve user data
+    user_data = fdb.get(user_data_path, None) or {}
+    user_state = user_data.get('state', 'new')
+
+    # Initialize the response message
+    reply_message = ""
+
+    # State machine logic
+    if user_state == 'new':
+        # User is new, ask for country/language
+        reply_message = "Welcome! Please enter your Country/Language (e.g., Japan/Japanese)."
+        user_data['state'] = 'waiting_for_country_language'
+        fdb.put(user_data_path, None, user_data)
+
+    elif user_state == 'waiting_for_country_language':
+        # Expecting Country/Language input
+        if re.match(r"^\w+/\w+$", text):
+            country, language = text.split('/')
+            user_data['country'] = country
+            user_data['language'] = language
+            user_data['state'] = 'waiting_for_major_grade'
+            fdb.put(user_data_path, None, user_data)
+            reply_message = "Thank you! What's your major/grade? Please enter in the format Major/Grade (e.g., Computer Science/26)."
+        else:
+            reply_message = "Please enter your Country/Language in the correct format (e.g., Japan/Japanese)."
+
+    elif user_state == 'waiting_for_major_grade':
+        # Expecting Major/Grade input
+        if re.match(r"^\w+/\d+$", text):
+            major, grade = text.split('/')
+            user_data['major'] = major
+            user_data['grade'] = grade
+            user_data['state'] = 'complete'
+            fdb.put(user_data_path, None, user_data)
+            reply_message = "Thank you! You can now start asking questions."
+        else:
+            reply_message = "Please enter your Major/Grade in the correct format (e.g., Computer Science/26)."
+
     else:
-        messages = conversation_data
+        # User has completed onboarding, proceed with assistant interaction
+        # Prepare assistant prompt with user info
+        country = user_data.get('country', '')
+        language = user_data.get('language', '')
+        major = user_data.get('major', '')
+        grade = user_data.get('grade', '')
 
-    if text == "C":
-        fdb.delete(user_chat_path, None)
-        reply_msg = "已清空對話紀錄"
-    elif is_url_valid(text):
-        image_data = check_image(text)
-        image_data = json.loads(image_data)
-        g_url = create_gcal_url(
-            image_data["title"],
-            image_data["time"],
-            image_data["location"],
-            image_data["content"],
+        # Add the user's message to the thread with additional context
+        assistant_prompt = f"Answer the following question in {language}, based on a {grade}-year-old {major} student from {country}."
+        client.beta.threads.messages.create(
+            thread_id=thread_id,
+            role="user",
+            content=f"{assistant_prompt}\n\nUser: {text}",
         )
-        reply_msg = shorten_url_by_reurl_api(g_url)
-    elif text == "A":
-        response = model.generate_content(
-            f"Summary the following message in Traditional Chinese by less 5 list points. \n{messages}"
-        )
-        reply_msg = response.text
-    else:
-        messages.append({"role": "user", "parts": [text]})
-        response = model.generate_content(messages)
-        messages.append({"role": "model", "parts": [text]})
-        # 更新firebase中的對話紀錄
-        fdb.put_async(user_chat_path, None, messages)
-        reply_msg = response.text
 
+        # Stream the assistant's response
+        event_handler = EventHandler()
+
+        try:
+            with client.beta.threads.runs.stream(
+                thread_id=thread_id,
+                assistant_id=assistant_id,
+                event_handler=event_handler,
+            ) as stream:
+                stream.until_done()
+
+            assistant_reply = event_handler.final_response
+
+        except Exception as e:
+            logger.error(f"OpenAI API error: {e}")
+            assistant_reply = "Sorry, I couldn't process your request."
+
+        # Remove content within 【】 from the assistant's reply
+        assistant_reply_cleaned = re.sub(r'【.*?】', '', assistant_reply)
+
+        # Store the assistant's reply in Firebase (optional)
+        fdb.put_async(user_chat_path, None, {"assistant_reply": assistant_reply_cleaned})
+
+        reply_message = assistant_reply_cleaned.strip()
+
+    # Send the reply to the user via LINE
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
         line_bot_api.reply_message(
             ReplyMessageRequest(
                 reply_token=event.reply_token,
-                messages=[TextMessage(text=reply_msg)],
+                messages=[TextMessage(text=reply_message)],
             )
         )
 
     return "OK"
-
 
 @handler.add(MessageEvent, message=ImageMessageContent)
 def handle_github_message(event):
@@ -175,10 +229,13 @@ def handle_github_message(event):
             )
         )
     return "OK"
-
-
+    
+# Entry point to run the application
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", default=8080))
-    debug = True if os.environ.get("API_ENV", default="develop") == "develop" else False
-    logging.info("Application will start...")
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=debug)
+    if len(sys.argv) > 1 and sys.argv[1] == "test":
+        local_test()  # Run local test if 'test' argument is provided
+    else:
+        port = int(os.getenv("PORT", 8080))
+        debug = os.getenv("API_ENV") == "develop"
+        logging.info("Starting the application...")
+        uvicorn.run("main:app", host="0.0.0.0", port=port, reload=debug)
